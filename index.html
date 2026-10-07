@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình phát MP3/MP4/Youtube - Tùy chỉnh Background</title>
+    <!-- Load Youtube Iframe API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background-color: #050508;
+            color: #e1e1e1;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+        }
+
+        /* KHUNG CHỨA ẢNH NỀN (BACKGROUND) */
+        .bg-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?q=80&w=2000'); 
+            background-size: cover;
+            background-position: center;
+            z-index: -1;
+            filter: brightness(0.35) blur(5px);
+        }
+
+        /* MP4 VIDEO BACKGROUND */
+        .bg-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            filter: brightness(0.35) blur(10px);
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            pointer-events: none;
+        }
+
+        .bg-video.active {
+            opacity: 1;
+        }
+
+        /* LỚP PHỦ TỐI CHO CHỮ NỔI BẬT */
+        .dark-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(5,5,8,0.2) 0%, rgba(5,5,8,0.8) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* THANH PLAYLIST NẰM NGANG PHÍA TRÊN */
+        .top-playlist-bar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 900px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 10px 15px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 30px;
+            z-index: 20;
+            scrollbar-width: none;
+        }
+
+        .top-playlist-bar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .playlist-chip {
+            padding: 6px 8px 6px 18px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #aaa;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .playlist-chip.active, .playlist-chip:hover {
+            background: #ffffff;
+            color: #000000;
+            font-weight: 600;
+        }
+
+        /* NÚT XÓA BÀI HÁT (✕) TRONG CHIP */
+        .delete-chip-btn {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .playlist-chip:hover .delete-chip-btn { color: #555; }
+        .playlist-chip.active .delete-chip-btn { color: #333; }
+        .delete-chip-btn:hover {
+            background: rgba(255, 0, 0, 0.15);
+            color: #ff3333 !important;
+        }
+
+        /* TÊN BÀI MỜ TO LÀM BACKGROUND */
+        .bg-giant-title {
+            position: absolute;
+            top: 48%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: clamp(6rem, 14vw, 15rem);
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.04);
+            white-space: nowrap;
+            letter-spacing: 12px;
+            pointer-events: none;
+            z-index: 2;
+            text-transform: uppercase;
+            transition: all 0.8s ease;
+        }
+
+        /* CONTAINER CHÍNH */
+        .main-container {
+            position: relative;
+            z-index: 3;
+            width: 85%;
+            max-width: 1000px;
+            height: 70vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        /* LỜI BÀI HÁT & VIETSUB SÁT NHAU */
+        .lyrics-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            max-width: 850px;
+            margin-bottom: 25px;
+            transition: opacity 0.3s ease;
+        }
+
+        .lyric-cn {
+            font-size: clamp(1.4rem, 2.6vw, 2.3rem);
+            color: #ffffff;
+            font-weight: 400;
+            letter-spacing: 2px;
+            margin-bottom: 4px;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+            line-height: 1.3;
+        }
+
+        .lyric-vi {
+            font-size: clamp(1.0rem, 1.6vw, 1.25rem);
+            color: #9999aa;
+            font-style: italic;
+            letter-spacing: 1px;
+            font-weight: 300;
+            line-height: 1.3;
+        }
+
+        /* TÊN BÀI HÁT VÀ CA SĨ (DỊCH LÊN TRÊN) */
+        .song-info-section {
+            text-align: center;
+            margin-top: -10px;
+            margin-bottom: 30px;
+        }
+
+        .song-title {
+            font-size: 1.6rem;
+            color: #dddde0;
+            font-weight: 500;
+            letter-spacing: 5px;
+            margin-bottom: 4px;
+        }
+
+        .artist-name {
+            font-size: 0.95rem;
+            color: #777788;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* THANH TIẾN TRÌNH THỜI GIAN */
+        .progress-bar-container {
+            width: 100%;
+            max-width: 550px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.8rem;
+            color: #666677;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: #ffffff;
+            border-radius: 2px;
+        }
+
+        /* ĐIỀU CHỈNH ÂM LƯỢNG GÓC DƯỚI */
+        .volume-container {
+            position: fixed;
+            bottom: 20px;
+            right: 25px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .volume-icon {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .volume-slider {
+            width: 70px;
+            height: 3px;
+            accent-color: #ffffff;
+            cursor: pointer;
+        }
+
+        /* YOUTUBE PLAYER ẨN */
+        #yt-player-container {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: -10;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ảnh nền -->
+    <div class="bg-image"></div>
+    <!-- Video background khi phát MP4 -->
+    <video class="bg-video" id="bg-video" loop playsinline muted></video>
+    <div class="dark-overlay"></div>
+
+    <!-- Div ẩn chạy YouTube API -->
+    <div id="yt-player-container"></div>
+    
+    <!-- Thanh Playlist nằm ngang -->
+    <div class="top-playlist-bar" id="top-playlist"></div>
+    
+    <!-- Tên bài mờ to background -->
+    <div class="bg-giant-title" id="bg-title">遐想</div>
+
+    <!-- Khung chính -->
+    <div class="main-container">
+        <div class="lyrics-section" id="lyrics-box">
+            <div class="lyric-cn" id="lyric-cn">“ 我们都不需要改 滚出彼此的世界就好了。”</div>
+            <div class="lyric-vi" id="lyric-vi">"Chúng ta đều không cần thay đổi, biến khỏi thế giới của nhau là được rồi."</div>
+        </div>
+
+        <div class="song-info-section">
+            <div class="song-title" id="display-title">《 遐想 》</div>
+            <div class="artist-name" id="display-artist">郑润泽 / DJ 小沐</div>
+        </div>
+
+        <div class="progress-bar-container" id="progress-container">
+            <span id="current-time">00:00</span>
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <span id="duration-time">00:00</span>
+        </div>
+    </div>
+
+    <!-- Thanh âm lượng -->
+    <div class="volume-container" onclick="event.stopPropagation()">
+        <span class="volume-icon">🔊</span>
+        <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="0.8">
+    </div>
+
+    <!-- Audio phát nhạc -->
+    <audio id="audio-player"></audio>
+
+    <!-- Thẻ Audio cho hiệu ứng âm thanh UI (Click) -->
+    <audio id="ui-click" src="https://actions.google.com/sounds/v1/ui/button_click.ogg"></audio>
+
+    <script>
+        // --- YOUTUBE API TRÌNH PHÁT ẨN ---
+        let ytPlayer;
+        let ytPlayerReady = false;
+
+        function onYouTubeIframeAPIReady() {
+            ytPlayer = new YT.Player('yt-player-container', {
+                height: '1',
+                width: '1',
+                videoId: '',
+                playerVars: { 'autoplay': 0, 'controls': 0, 'disablekb': 1 },
+                events: {
+                    'onReady': () => {
+                        ytPlayerReady = true;
+                        ytPlayer.setVolume(document.getElementById('volume-slider').value * 100);
+                    }
+                }
+            });
+        }
+
+        // --- CƠ SỞ DỮ LIỆU PLAYLIST ---
+        let playlist = [
+            {
+                id: 1,
+                title: "遐想",
+                artist: "郑润泽 / DJ 小沐",
+                src: "", // Chạy demo lời
+                isVideo: false,
+                isYoutube: false,
+                ytId: null,
+                lyrics: [
+                    { time: 0, cn: "“ 我们都不需要改 滚出彼此的世界就好了。”", vi: `"Chúng ta đều không cần thay đổi, biến khỏi thế giới của nhau là được rồi."` },
+                    { time: 4, cn: "抓破头的想 直想", vi: "Vò đầu bứt tai nghĩ, cứ nghĩ mãi" },
+                    { time: 8, cn: "太模糊的答案", vi: "Một đáp án quá đỗi mơ hồ" }
+                ]
+            }
+        ];
+
+        let currentSongIndex = 0;
+        let currentLyricIndex = -1;
+        let isPlaying = false;
+
+        // DOM Elements
+        const audio = document.getElementById('audio-player');
+        const bgVideo = document.getElementById('bg-video');
+        const bgTitle = document.getElementById('bg-title');
+        const displayTitle = document.getElementById('display-title');
+        const displayArtist = document.getElementById('display-artist');
+        const lyricCn = document.getElementById('lyric-cn');
+        const lyricVi = document.getElementById('lyric-vi');
+        const progressBar = document.getElementById('progress-bar');
+        const progressFill = document.getElementById('progress-fill');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationTimeEl = document.getElementById('duration-time');
+        const topPlaylist = document.getElementById('top-playlist');
+        const volumeSlider = document.getElementById('volume-slider');
+
+        // Âm thanh UI
+        const uiClickSound = document.getElementById('ui-click');
+
+        function playClickUI() {
+            uiClickSound.currentTime = 0;
+            uiClickSound.play().catch(() => {});
+        }
+
+        // Nạp Bài Hát
+        function loadSong(index) {
+            const song = playlist[index];
+            currentLyricIndex = -1;
+
+            bgTitle.innerText = song.title;
+            displayTitle.innerText = `《 ${song.title} 》`;
+            displayArtist.innerText = song.artist || "Nghệ sĩ chưa rõ";
+
+            audio.pause();
+            bgVideo.pause();
+            if (ytPlayerReady) ytPlayer.pauseVideo();
+            audio.src = "";
+            bgVideo.src = "";
+            bgVideo.classList.remove('active');
+
+            if (song.isYoutube && song.ytId && ytPlayerReady) {
+                ytPlayer.loadVideoById(song.ytId);
+                ytPlayer.pauseVideo();
+            } else if (song.isVideo && song.src) {
+                bgVideo.src = song.src;
+                bgVideo.classList.add('active');
+            } else if (song.src) {
+                audio.src = song.src;
+            }
+
+            if (song.lyrics && song.lyrics.length > 0) {
+                lyricCn.innerText = song.lyrics[0].cn;
+                lyricVi.innerText = song.lyrics[0].vi;
+            }
+
+            renderTopPlaylist();
+        }
+
+        function togglePlay() {
+            playClickUI();
+            
+            const song = playlist[currentSongIndex];
+            if (!song.src && !song.ytId) {
+                isPlaying = !isPlaying;
+                return;
+            }
+
+            if (isPlaying) {
+                if (song.isYoutube && ytPlayerReady) ytPlayer.pauseVideo();
+                else if (song.isVideo) bgVideo.pause();
+                else audio.pause();
+            } else {
+                if (song.isYoutube && ytPlayerReady) ytPlayer.playVideo();
+                else if (song.isVideo) bgVideo.play();
+                else audio.play();
+            }
+            isPlaying = !isPlaying;
+        }
+
+        // Đồng bộ thời gian & Lời nhạc
+        setInterval(() => {
+            if (!isPlaying) return;
+            const song = playlist[currentSongIndex];
+            let cTime = 0, dTime = 0;
+
+            if (song.isYoutube && ytPlayerReady) {
+                if (ytPlayer.getDuration() > 0) {
+                    cTime = ytPlayer.getCurrentTime();
+                    dTime = ytPlayer.getDuration();
+                }
+            } else if (song.isVideo) {
+                cTime = bgVideo.currentTime;
+                dTime = bgVideo.duration || 0;
+            } else {
+                cTime = audio.currentTime;
+                dTime = audio.duration || 0;
+            }
+
+            if (dTime > 0) {
+                const percent = (cTime / dTime) * 100;
+                progressFill.style.width = `${percent}%`;
+                currentTimeEl.innerText = formatTime(cTime);
+                durationTimeEl.innerText = formatTime(dTime);
+                syncLyrics(song, cTime);
+            }
+        }, 200);
+
+        function syncLyrics(song, currentTime) {
+            const lyrics = song.lyrics;
+            if (lyrics && lyrics.length > 0) {
+                let activeIdx = 0;
+                for (let i = 0; i < lyrics.length; i++) {
+                    if (currentTime >= lyrics[i].time) activeIdx = i;
+                    else break;
+                }
+                if (activeIdx !== currentLyricIndex) {
+                    currentLyricIndex = activeIdx;
+                    lyricCn.innerText = lyrics[currentLyricIndex].cn;
+                    lyricVi.innerText = lyrics[currentLyricIndex].vi;
+                }
+            }
+        }
+
+        // Chuyển bài
+        function nextSong() {
+            if (isPlaying) togglePlay();
+            currentSongIndex = (currentSongIndex + 1) % playlist.length;
+            loadSong(currentSongIndex);
+            togglePlay();
+        }
+
+        function prevSong() {
+            if (isPlaying) togglePlay();
+            currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
+            loadSong(currentSongIndex);
+            togglePlay();
+        }
+
+        // Phím tắt Laptop
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') { 
+                e.preventDefault(); togglePlay();
+            } else if (e.code === 'ArrowRight') nextSong();
+            else if (e.code === 'ArrowLeft') prevSong();
+            else if (e.code === 'ArrowUp') adjustVolume(0.1);
+            else if (e.code === 'ArrowDown') adjustVolume(-0.1);
+        });
+
+        function adjustVolume(change) {
+            let val = Math.max(0, Math.min(1, parseFloat(volumeSlider.value) + change));
+            volumeSlider.value = val;
+            applyVolume(val);
+        }
+
+        volumeSlider.addEventListener('input', (e) => applyVolume(parseFloat(e.target.value)));
+
+        function applyVolume(val) {
+            audio.volume = val;
+            bgVideo.volume = val;
+            if (ytPlayerReady) ytPlayer.setVolume(val * 100);
+        }
+
+        // Thao tác kéo thả / Swipe
+        let startX = 0;
+        document.body.addEventListener('mousedown', e => {
+            if (e.target.closest('.top-playlist-bar') || e.target.closest('#progress-container') || e.target.closest('.volume-container')) return;
+            startX = e.clientX;
+        });
+
+        document.body.addEventListener('mouseup', e => {
+            if (e.target.closest('.top-playlist-bar') || e.target.closest('#progress-container') || e.target.closest('.volume-container')) return;
+            let diffX = e.clientX - startX;
+            if (Math.abs(diffX) > 50) diffX < 0 ? nextSong() : prevSong();
+            else togglePlay(); 
+        });
+
+        // Tua nhạc
+        progressBar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playClickUI();
+            const song = playlist[currentSongIndex];
+            const percent = e.offsetX / progressBar.clientWidth;
+            
+            if (song.isYoutube && ytPlayerReady && ytPlayer.getDuration()) {
+                ytPlayer.seekTo(percent * ytPlayer.getDuration(), true);
+            } else if (song.isVideo && bgVideo.duration) {
+                bgVideo.currentTime = percent * bgVideo.duration;
+            } else if (audio.duration) {
+                audio.currentTime = percent * audio.duration;
+            }
+        });
+
+        // Render Playlist & Xóa
+        function renderTopPlaylist() {
+            topPlaylist.innerHTML = "";
+            playlist.forEach((song, idx) => {
+                const chip = document.createElement('div');
+                chip.className = `playlist-chip ${idx === currentSongIndex ? 'active' : ''}`;
+                
+                const titleSpan = document.createElement('span');
+                titleSpan.innerText = song.title;
+                chip.appendChild(titleSpan);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'delete-chip-btn';
+                delBtn.innerHTML = '✕';
+                delBtn.title = 'Xóa bài này';
+                delBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    playClickUI();
+                    deleteSong(idx);
+                });
+
+                chip.appendChild(delBtn);
+
+                chip.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    playClickUI();
+                    if (isPlaying) togglePlay();
+                    currentSongIndex = idx;
+                    loadSong(currentSongIndex);
+                    togglePlay();
+                });
+
+                topPlaylist.appendChild(chip);
+            });
+        }
+
+        function deleteSong(idx) {
+            if (playlist.length <= 1) {
+                alert("Đây là bài hát duy nhất, bạn không thể xóa!");
+                return;
+            }
+
+            const isCurrentlyPlaying = (currentSongIndex === idx);
+            playlist.splice(idx, 1);
+
+            if (isCurrentlyPlaying) {
+                currentSongIndex = currentSongIndex % playlist.length;
+                loadSong(currentSongIndex);
+                if (isPlaying) togglePlay();
+            } else if (currentSongIndex > idx) {
+                currentSongIndex--;
+            }
+
+            renderTopPlaylist();
+        }
+
+        function formatTime(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min < 10 ? '0' : ''}${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        loadSong(0);
+    </script>
+</body>
+</html>
